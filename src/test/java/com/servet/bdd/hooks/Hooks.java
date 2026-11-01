@@ -1,5 +1,8 @@
 package com.servet.bdd.hooks;
 
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
 
@@ -14,10 +17,18 @@ import io.cucumber.java.Scenario;
 
 /**
  * Hooks run around every scenario (or step). order: lower runs first for @Before, last for @After.
+ * The Browser is injected by PicoContainer: the same object the step classes of this scenario get.
  */
 public class Hooks {
 
     private static long suiteStart;
+    private static final Set<String> threads = ConcurrentHashMap.newKeySet();
+
+    private final Browser browser;
+
+    public Hooks(Browser browser) {
+        this.browser = browser;
+    }
 
     @BeforeAll
     public static void beforeAll() {
@@ -25,8 +36,12 @@ public class Hooks {
     }
 
     @Before(order = 0)
-    public void startBrowser() {
-        Browser.start();
+    public void startBrowser(Scenario scenario) {
+        threads.add(Thread.currentThread().getName());
+        browser.start();
+        if (browser.startRetried()) {
+            scenario.log("Chrome did not start on the first attempt and was started again");
+        }
     }
 
     /** Tagged hook: only for scenarios tagged @slow — they are allowed to take longer. */
@@ -38,19 +53,20 @@ public class Hooks {
     /** After a failed step the page still shows the problem: attach it to the report right there. */
     @AfterStep
     public void screenshotOnFailedStep(Scenario scenario) {
-        if (scenario.isFailed()) {
-            byte[] png = ((TakesScreenshot) Browser.driver()).getScreenshotAs(OutputType.BYTES);
+        if (scenario.isFailed() && browser.isStarted()) {
+            byte[] png = ((TakesScreenshot) browser.driver()).getScreenshotAs(OutputType.BYTES);
             scenario.attach(png, "image/png", "Screenshot after the failed step");
         }
     }
 
     @After(order = 0)
     public void quitBrowser() {
-        Browser.quit();
+        browser.quit();
     }
 
     @AfterAll
     public static void afterAll() {
-        System.out.printf("All scenarios finished in %.1f s%n", (System.currentTimeMillis() - suiteStart) / 1000.0);
+        System.out.printf("All scenarios finished in %.1f s on %d thread(s)%n",
+                (System.currentTimeMillis() - suiteStart) / 1000.0, threads.size());
     }
 }

@@ -15,9 +15,13 @@ concurrency:
 
 jobs:
   ui:
-    name: UI scenarios (saucedemo, headless Chrome)
+    name: UI scenarios (${{ matrix.runner }}, 4 in parallel)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [junit, testng]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
@@ -26,12 +30,12 @@ jobs:
           java-version: '21'
           cache: maven
       - name: Run the UI scenarios
-        run: mvn -B test -Dheadless=true
+        run: mvn -B test -P${{ matrix.runner }} -Dheadless=true -Dthreads=4
       - name: Upload the Cucumber report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: cucumber-report-ui
+          name: cucumber-report-ui-${{ matrix.runner }}
           path: |
             target/cucumber-report.html
             target/cucumber.json

@@ -28,6 +28,12 @@ public class InventoryPage extends BasePage {
         return this;
     }
 
+    /** The price the product list shows for this product, e.g. 29.99 for "$29.99". */
+    public double priceOf(String product) {
+        return price(visible(By.xpath("//div[@data-test='inventory-item'][.//div[text()='" + product
+                + "']]//div[@data-test='inventory-item-price']")).getText());
+    }
+
     public void sortBy(String visibleText) {
         new Select(visible(SORT)).selectByVisibleText(visibleText);
     }

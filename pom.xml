@@ -5,18 +5,21 @@
 
   <groupId>com.servet</groupId>
   <artifactId>cucumber-bdd</artifactId>
-  <version>1.0.0</version>
+  <version>1.1.0</version>
   <name>cucumber-bdd</name>
-  <description>BDD with Cucumber: Gherkin, hooks and tags on saucedemo (Selenium)</description>
+  <description>BDD with Cucumber: Gherkin, hooks, tags; parallel scenarios with PicoContainer (JUnit Platform or TestNG)</description>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>21</maven.compiler.release>
     <cucumber.version>8.0.4</cucumber.version>
     <junit.version>6.1.3</junit.version>
+    <testng.version>7.12.0</testng.version>
     <selenium.version>4.51.0</selenium.version>
     <assertj.version>3.27.7</assertj.version>
     <jackson.version>3.2.4</jackson.version>
+    <!-- scenarios running at the same time; mvn test -Dthreads=1 runs them one after another -->
+    <threads>4</threads>
   </properties>
 
   <dependencyManagement>
@@ -44,15 +47,10 @@
       <artifactId>cucumber-java</artifactId>
       <scope>test</scope>
     </dependency>
-    <!-- Cucumber runs as a JUnit Platform engine; the suite class tells it where the features are -->
+    <!-- PicoContainer: new step/hook objects per scenario, shared objects injected by constructor -->
     <dependency>
       <groupId>io.cucumber</groupId>
-      <artifactId>cucumber-junit-platform-engine</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.junit.platform</groupId>
-      <artifactId>junit-platform-suite</artifactId>
+      <artifactId>cucumber-picocontainer</artifactId>
       <scope>test</scope>
     </dependency>
     <!-- Cucumber 8 no longer brings a JSON library; it needs one for the html/json reports -->
@@ -92,4 +90,93 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <!-- Default: the Cucumber JUnit Platform engine (the runner Cucumber recommends) -->
+    <profile>
+      <id>junit</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+      <dependencies>
+        <dependency>
+          <groupId>io.cucumber</groupId>
+          <artifactId>cucumber-junit-platform-engine</artifactId>
+          <scope>test</scope>
+        </dependency>
+        <dependency>
+          <groupId>org.junit.platform</groupId>
+          <artifactId>junit-platform-suite</artifactId>
+          <scope>test</scope>
+        </dependency>
+      </dependencies>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+              <testExcludes>
+                <testExclude>**/RunCucumberTestNG.java</testExclude>
+              </testExcludes>
+            </configuration>
+          </plugin>
+          <plugin>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <!-- JUnit Platform also reads configuration parameters from system properties -->
+              <systemPropertyVariables>
+                <cucumber.execution.parallel.config.fixed.parallelism>${threads}</cucumber.execution.parallel.config.fixed.parallelism>
+                <cucumber.execution.parallel.config.fixed.max-pool-size>${threads}</cucumber.execution.parallel.config.fixed.max-pool-size>
+              </systemPropertyVariables>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <!-- mvn test -Ptestng: the same features and steps, run by TestNG as rows of a parallel DataProvider.
+         cucumber-testng is deprecated for removal since Cucumber 8.0, so it is the second choice here. -->
+    <profile>
+      <id>testng</id>
+      <dependencies>
+        <dependency>
+          <groupId>io.cucumber</groupId>
+          <artifactId>cucumber-testng</artifactId>
+          <scope>test</scope>
+        </dependency>
+        <dependency>
+          <groupId>org.testng</groupId>
+          <artifactId>testng</artifactId>
+          <version>${testng.version}</version>
+          <scope>test</scope>
+        </dependency>
+      </dependencies>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+              <testExcludes>
+                <testExclude>**/RunCucumberTest.java</testExclude>
+              </testExcludes>
+            </configuration>
+          </plugin>
+          <plugin>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <includes>
+                <include>**/RunCucumberTestNG.java</include>
+              </includes>
+              <properties>
+                <property>
+                  <name>dataproviderthreadcount</name>
+                  <value>${threads}</value>
+                </property>
+              </properties>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

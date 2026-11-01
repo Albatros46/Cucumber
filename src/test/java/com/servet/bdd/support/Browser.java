@@ -2,23 +2,40 @@ package com.servet.bdd.support;
 
 import java.util.Map;
 
+import org.openqa.selenium.SessionNotCreatedException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 
 /**
- * Week 17: the simplest way to share the browser between hooks and step classes — a static field.
- * It works because the scenarios run one after another. It would NOT survive parallel scenarios
- * (they would share one browser); Week 18 replaces it with dependency injection (PicoContainer).
+ * One browser per scenario. PicoContainer creates one Browser object per scenario and passes the
+ * same object to the hooks and to every step class that asks for it in its constructor.
+ * Parallel scenarios therefore never share a browser — no static field, no ThreadLocal.
  */
-public final class Browser {
+public class Browser {
 
-    private static WebDriver driver;
+    private WebDriver driver;
+    private boolean startRetried;
 
-    private Browser() {
+    /**
+     * Starting several Chromes at the same moment sometimes fails on Windows with
+     * "session not created: unable to connect to renderer". That is the browser not starting,
+     * not the test failing, so the start (only the start) is tried a second time.
+     */
+    public void start() {
+        try {
+            driver = new ChromeDriver(options());
+        } catch (SessionNotCreatedException firstAttempt) {
+            startRetried = true;
+            driver = new ChromeDriver(options());
+        }
     }
 
-    public static void start() {
+    public boolean startRetried() {
+        return startRetried;
+    }
+
+    private static ChromeOptions options() {
         ChromeOptions options = new ChromeOptions();
         if (Config.HEADLESS) {
             options.addArguments("--headless=new");
@@ -27,17 +44,21 @@ public final class Browser {
         // the demo password is public, so Chrome would show a "password leaked" dialog over the page
         options.setExperimentalOption("prefs", Map.of("credentials_enable_service", false,
                 "profile.password_manager_enabled", false, "profile.password_manager_leak_detection", false));
-        driver = new ChromeDriver(options);
+        return options;
     }
 
-    public static WebDriver driver() {
+    public WebDriver driver() {
         if (driver == null) {
             throw new IllegalStateException("No browser: is the scenario missing the @Before hook?");
         }
         return driver;
     }
 
-    public static void quit() {
+    public boolean isStarted() {
+        return driver != null;
+    }
+
+    public void quit() {
         if (driver != null) {
             driver.quit();
             driver = null;

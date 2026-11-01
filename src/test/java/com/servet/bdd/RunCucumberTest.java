@@ -1,12 +1,12 @@
 package com.servet.bdd;
 
 import org.junit.platform.suite.api.IncludeEngines;
-import org.junit.platform.suite.api.SelectClasspathResource;
+import org.junit.platform.suite.api.SelectPackages;
 import org.junit.platform.suite.api.Suite;
 
-/** Entry point for mvn test: runs every .feature under src/test/resources/features with Cucumber. */
+/** Entry point for mvn test: runs every .feature in the package "features" (src/test/resources/features). */
 @Suite
 @IncludeEngines("cucumber")
-@SelectClasspathResource("features")
+@SelectPackages("features")
 class RunCucumberTest {
 }
