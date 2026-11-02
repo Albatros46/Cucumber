@@ -204,6 +204,3 @@ mvn test -Ptestng -Dcucumber.filter.tags=@api               # the same with Test
 - Cucumber 8 deprecates `cucumber-testng` for removal and changed `scenarios()` to `scenarios(ITestContext)`; the JUnit Platform engine warns about `@SelectClasspathResource("features")` and wants `@SelectPackages("features")`.
 - Surefire's `configurationParameters` did not reach the suite's Cucumber engine (*"Configuration parameter 'fixed.parallelism' must be set"*); passing them as system properties works.
 - Chrome shows a "password found in a data breach" dialog for the public demo password; it is switched off in `ChromeOptions`, otherwise it covers the page.
-
-## What I learned
-- _TODO: 2–3 sentences in your own words_
