@@ -12,7 +12,7 @@ import io.cucumber.testng.CucumberOptions;
  * dataproviderthreadcount, pom: ${threads}). TestNG does not read junit-platform.properties,
  * so the options are repeated here.
  */
-@CucumberOptions(features = "classpath:features", glue = "com.servet.bdd",
+@CucumberOptions(features = "classpath:features", glue = "com.servet.bdd", tags = "not @api",
         plugin = {"summary", "html:target/cucumber-report.html", "json:target/cucumber.json"})
 @SuppressWarnings("removal") // cucumber-testng is deprecated for removal since Cucumber 8.0
 public class RunCucumberTestNG extends AbstractTestNGCucumberTests {

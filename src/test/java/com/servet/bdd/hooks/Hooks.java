@@ -35,9 +35,15 @@ public class Hooks {
         suiteStart = System.currentTimeMillis();
     }
 
-    @Before(order = 0)
-    public void startBrowser(Scenario scenario) {
+    /** Untagged: every scenario, UI or API, records the thread it runs on. */
+    @Before(order = -1)
+    public void recordThread() {
         threads.add(Thread.currentThread().getName());
+    }
+
+    /** Tagged hook: only UI scenarios get a browser; the API scenarios run without one. */
+    @Before(value = "@ui", order = 0)
+    public void startBrowser(Scenario scenario) {
         browser.start();
         if (browser.startRetried()) {
             scenario.log("Chrome did not start on the first attempt and was started again");
@@ -59,7 +65,7 @@ public class Hooks {
         }
     }
 
-    @After(order = 0)
+    @After(value = "@ui", order = 0)
     public void quitBrowser() {
         browser.quit();
     }

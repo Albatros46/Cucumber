@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: '0 5 * * *'
   workflow_dispatch:
 
 permissions:
@@ -12,6 +14,10 @@ permissions:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  API_REPOSITORY: Albatros46/Spotify_Clone
+  API_VERSION: v1.1.0
 
 jobs:
   ui:
@@ -39,5 +45,74 @@ jobs:
           path: |
             target/cucumber-report.html
             target/cucumber.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  api:
+    name: API scenarios (Spotify Clone v1.1.0)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18.4-alpine
+        env:
+          POSTGRES_DB: spotify_music
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Checkout the API (${{ env.API_REPOSITORY }} @ ${{ env.API_VERSION }})
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ env.API_REPOSITORY }}
+          ref: ${{ env.API_VERSION }}
+          path: api
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: '**/pom.xml'
+
+      - name: Generate a JWT secret for this run (masked)
+        run: |
+          secret=$(openssl rand -hex 32)
+          echo "::add-mask::$secret"
+          echo "JWT_SECRET=$secret" >> "$GITHUB_ENV"
+
+      - name: Build and start the API
+        working-directory: api
+        env:
+          DB_PASSWORD: ci-only-password
+        run: |
+          ./mvnw -B -q -DskipTests package
+          jar=$(ls target/Spotify_Clone-*.jar | grep -v original)
+          nohup java -jar "$jar" > ../api.log 2>&1 &
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8042/api/users/me || true)
+            if [ "$code" = "401" ]; then echo "API is up after $((i * 2)) s"; exit 0; fi
+            sleep 2
+          done
+          echo "API did not start"; cat ../api.log; exit 1
+
+      - name: Run the API scenarios
+        run: mvn -B test -Dcucumber.filter.tags=@api -DapiUrl=http://localhost:8042 -Dthreads=4
+
+      - name: Upload the Cucumber report and the API log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cucumber-report-api
+          path: |
+            target/cucumber-report.html
+            target/cucumber.json
+            api.log
           if-no-files-found: ignore
           retention-days: 14

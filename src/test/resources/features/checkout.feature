@@ -1,4 +1,4 @@
-@checkout
+@ui @checkout
 Feature: Checkout
   A shopper pays for the cart; the totals must add up.
 

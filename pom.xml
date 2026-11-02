@@ -5,9 +5,9 @@
 
   <groupId>com.servet</groupId>
   <artifactId>cucumber-bdd</artifactId>
-  <version>1.1.0</version>
+  <version>1.2.0</version>
   <name>cucumber-bdd</name>
-  <description>BDD with Cucumber: Gherkin, hooks, tags; parallel scenarios with PicoContainer (JUnit Platform or TestNG)</description>
+  <description>BDD with Cucumber: UI scenarios (Selenium) and API scenarios (REST Assured), parallel with PicoContainer</description>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -18,8 +18,11 @@
     <selenium.version>4.51.0</selenium.version>
     <assertj.version>3.27.7</assertj.version>
     <jackson.version>3.2.4</jackson.version>
+    <rest-assured.version>6.2.0</rest-assured.version>
     <!-- scenarios running at the same time; mvn test -Dthreads=1 runs them one after another -->
     <threads>4</threads>
+    <!-- @api scenarios need the Spotify Clone API: mvn test -Dcucumber.filter.tags=@api -DapiUrl=... -->
+    <cucumber.filter.tags>not @api</cucumber.filter.tags>
   </properties>
 
   <dependencyManagement>
@@ -66,6 +69,13 @@
       <version>${selenium.version}</version>
       <scope>test</scope>
     </dependency>
+    <!-- Week 19: API scenarios -->
+    <dependency>
+      <groupId>io.rest-assured</groupId>
+      <artifactId>rest-assured</artifactId>
+      <version>${rest-assured.version}</version>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.assertj</groupId>
       <artifactId>assertj-core</artifactId>
@@ -86,6 +96,9 @@
         <configuration>
           <!-- project on E:, manifest JAR on C: -> JDK 26 drops classpath entries otherwise -->
           <useManifestOnlyJar>false</useManifestOnlyJar>
+          <systemPropertyVariables>
+            <cucumber.filter.tags>${cucumber.filter.tags}</cucumber.filter.tags>
+          </systemPropertyVariables>
         </configuration>
       </plugin>
     </plugins>

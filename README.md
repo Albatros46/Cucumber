@@ -1,9 +1,9 @@
-# Cucumber BDD · Gherkin, Hooks, Tags · Parallel with PicoContainer
+# Cucumber BDD · UI (Selenium) + API (REST Assured) · Parallel with PicoContainer
 
 [![BDD Tests](https://github.com/Albatros46/Cucumber/actions/workflows/bdd-tests.yml/badge.svg)](https://github.com/Albatros46/Cucumber/actions/workflows/bdd-tests.yml)
-![Java](https://img.shields.io/badge/Java-21-orange) ![Cucumber](https://img.shields.io/badge/Cucumber-8.0-23D96C) ![Selenium](https://img.shields.io/badge/Selenium-4.51-43B02A) ![JUnit Platform](https://img.shields.io/badge/JUnit%20Platform-6.1-25A162) ![TestNG](https://img.shields.io/badge/TestNG-7.12-CD6E00) ![PicoContainer](https://img.shields.io/badge/DI-PicoContainer-6A5ACD) ![Scenarios](https://img.shields.io/badge/scenarios-16-brightgreen)
+![Java](https://img.shields.io/badge/Java-21-orange) ![Cucumber](https://img.shields.io/badge/Cucumber-8.0-23D96C) ![Selenium](https://img.shields.io/badge/Selenium-4.51-43B02A) ![JUnit Platform](https://img.shields.io/badge/JUnit%20Platform-6.1-25A162) ![TestNG](https://img.shields.io/badge/TestNG-7.12-CD6E00) ![PicoContainer](https://img.shields.io/badge/DI-PicoContainer-6A5ACD) ![REST Assured](https://img.shields.io/badge/REST%20Assured-6.2-blue) ![Scenarios](https://img.shields.io/badge/scenarios-16%20UI%20%2B%2018%20API-brightgreen)
 
-Behaviour-driven tests for the [Sauce Demo](https://www.saucedemo.com/) shop: the **feature files** describe the behaviour in plain English (Gherkin), Java **step definitions** drive the browser with Selenium.
+Behaviour-driven tests in one project: the [Sauce Demo](https://www.saucedemo.com/) shop through the **browser** (Selenium) and my [Spotify Clone](https://github.com/Albatros46/Spotify_Clone) through its **REST API** (REST Assured). The **feature files** describe the behaviour in plain English (Gherkin); Java **step definitions** make it executable.
 
 Part of my 52-week QA Automation roadmap:
 
@@ -11,6 +11,7 @@ Part of my 52-week QA Automation roadmap:
 |---|---|---|
 | 17 | Gherkin, hooks, tags | [v1.0.0](https://github.com/Albatros46/Cucumber/releases/tag/v1.0.0) |
 | 18 | Parallel scenarios, PicoContainer, TestNG runner | [v1.1.0](https://github.com/Albatros46/Cucumber/releases/tag/v1.1.0) |
+| 19 | API scenarios with REST Assured | [v1.2.0](https://github.com/Albatros46/Cucumber/releases/tag/v1.2.0) |
 
 ## What a scenario looks like
 
@@ -58,7 +59,7 @@ A product owner can read (and review) this; the same text is an executable test.
 `@login` `@cart` `@checkout` (per feature) · `@smoke` `@e2e` `@negative` `@slow` (per scenario)
 
 ```bash
-mvn test                                              # all 16 scenarios, 4 at a time
+mvn test                                              # all 16 UI scenarios, 4 at a time
 mvn test -Dcucumber.filter.tags="@smoke"              # the 3 most important ones
 mvn test -Dcucumber.filter.tags="@smoke and not @e2e" # 2 scenarios (verified)
 mvn test -Dcucumber.filter.tags="not @slow"           # 15 scenarios (verified)
@@ -74,14 +75,17 @@ After every run: `target/cucumber-report.html` (self-contained HTML, with screen
 ```
 src/test/resources/
 ├── junit-platform.properties     glue, plugins (summary, html, json), parallel execution
-└── features/                     login.feature · cart.feature · checkout.feature
+└── features/                     login · cart · checkout (@ui)
+    └── api/                      auth · playlists (@api)
 src/test/java/com/servet/bdd/
 ├── RunCucumberTest               JUnit Platform @Suite -> the Cucumber engine (default profile)
 ├── RunCucumberTestNG             TestNG runner with a parallel DataProvider (-Ptestng)
-├── hooks/Hooks                   @BeforeAll · @Before · tagged @Before · @AfterStep · @After · @AfterAll
+├── hooks/Hooks                   @BeforeAll · @Before("@ui") · tagged @slow · @AfterStep · @After("@ui") · @AfterAll
+├── hooks/ApiHooks                @AfterStep("@api"): last response (tokens masked) on failure
 ├── steps/                        LoginSteps · CartSteps · CheckoutSteps (constructor injection)
+├── steps/api/                    UserSteps · PlaylistSteps · ResponseSteps
 ├── pages/                        page objects (Login, Inventory, Cart, Checkout)
-└── support/                      Browser (one per scenario) · ScenarioState · Config
+└── support/                      Browser · ScenarioState · Config · ApiClient · ApiState · ApiConfig · TestAudio
 ```
 
 ## Week 18: parallel scenarios and PicoContainer
@@ -143,6 +147,57 @@ Only about **15–20 % faster** here — the per-scenario times in `cucumber.jso
 ### Flakiness found and handled
 
 One run with 2 threads failed with `SessionNotCreatedException: unable to connect to renderer` — **Chrome did not start**, the test itself never ran. `Browser.start()` now tries the start once more and writes *"Chrome did not start on the first attempt…"* into the report. Only the browser start is retried, never a test result. 3 further runs with 4 threads: 16 / 16 green each, no retry needed.
+
+## Week 19: API scenarios with REST Assured
+
+Business rules of the Spotify Clone API, written so a product owner can check them:
+
+```gherkin
+Scenario Outline: Another user cannot <action> a private playlist
+  When "Bob" tries to <action> the playlist "Anna's Mix"
+  Then the response status is 404
+  And the error message says that the playlist "Anna's Mix" was not found
+
+  Examples:
+    | action |
+    | open   |
+    | rename |
+    | delete |
+```
+
+| Feature | Scenarios | Rules |
+|---|---|---|
+| `api/auth.feature` | 7 | register (201, role `USER`) and login (JWT-shaped tokens) · duplicate e-mail → 409 · failed login gives the **same** 401 message for a wrong password and an unknown e-mail · validation messages for name, e-mail, password |
+| `api/playlists.feature` | 11 | private playlist: owner 200, others **404 not 403** for open / rename / delete · public playlist: others may read, still not change · public list never contains private playlists · no token → 401 · same song twice → 409 · removing a song renumbers the positions (DataTable as `List<Map>`) · name validation |
+
+### How it fits the Week 17–18 design
+
+- **Tags decide the setup:** UI features are tagged `@ui`, API features `@api`. The browser hooks are tagged hooks (`@Before("@ui")`, `@After("@ui")`), so API scenarios start no browser at all — 18 API scenarios take about 10 s.
+- **PicoContainer again:** `ApiClient` (REST Assured spec + the last response) and `ApiState` (users, playlists, songs by the names the feature uses) are new per scenario and shared by `UserSteps`, `PlaylistSteps`, `ResponseSteps` and `ApiHooks`. API scenarios run in parallel like the UI ones.
+- **Independent data:** every scenario registers its own users with a random part in the e-mail (`anna.6ee2ec9d@bdd.example.com`), uploads its own songs (a generated 0.1 s WAV) and creates its own playlists — no shared test data, no order dependency, repeatable against the same database.
+- **Names, not ids, in the feature:** `"Anna's Mix"` and `"Morning Rain"` are mapped to the real ids; `Song <Morning Rain> is already in this playlist` becomes `Song 17 …` before comparing.
+- **The API counterpart of the screenshot:** `@AfterStep("@api")` attaches the last response to the report when a step fails — with `accessToken` and `refreshToken` replaced by `***`.
+
+### Control runs
+
+| Change | Result |
+|---|---|
+| Expected `403` instead of `404` for Bob opening Anna's private playlist | step **failed**, report shows `404 {"message":"Playlist 30 not found", …}` |
+| Expected `201` instead of `200` right after a login | step **failed**, report shows the login response with `"accessToken":"***","refreshToken":"***"` |
+| Search for JWTs (`eyJ…`) in `cucumber.json` and the HTML report | **0** |
+
+The control feature was deleted afterwards.
+
+### Run
+
+```bash
+mvn test                                                    # UI scenarios only (default filter "not @api")
+mvn test -Dcucumber.filter.tags=@api                        # API scenarios, Spotify Clone API on :8042
+mvn test -Dcucumber.filter.tags=@api -DapiUrl=http://host:8042
+mvn test -Ptestng -Dcucumber.filter.tags=@api               # the same with TestNG
+```
+
+**CI** (every push and every night): the UI job runs both runners; the API job starts PostgreSQL, builds and starts the Spotify Clone API at **v1.1.0** with a per-run JWT secret and runs the `@api` scenarios.
 
 ## Notes from the build
 - Cucumber 8 no longer brings a JSON library: without Jackson the run fails with *"Cucumber needs a JSON library to write reports"*. Added `tools.jackson.core:jackson-databind` 3.x.

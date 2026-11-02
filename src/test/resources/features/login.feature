@@ -1,4 +1,4 @@
-@login
+@ui @login
 Feature: Login
   As a shopper I want to log in, so that I can buy products.
   Locked or unknown users must get a clear message instead.

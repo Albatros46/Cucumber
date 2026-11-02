@@ -1,4 +1,4 @@
-@cart
+@ui @cart
 Feature: Shopping cart
   The cart badge and the cart page must always show what was added.
 
